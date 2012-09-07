@@ -86,7 +86,7 @@ public class EchoServerActivity extends Activity implements
 	 *            port number.
 	 * @throws Exception
 	 */
-	private native void startTcpServer(int port) throws Exception;
+	private native void nativeStartTcpServer(int port) throws Exception;
 
 	/**
 	 * Server task.
@@ -101,7 +101,7 @@ public class EchoServerActivity extends Activity implements
 			int port = ports[0].intValue();
 
 			try {
-				startTcpServer(port);
+				nativeStartTcpServer(port);
 			} catch (Exception e) {
 				publishProgress(e.getMessage());
 			}
