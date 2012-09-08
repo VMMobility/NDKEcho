@@ -14,7 +14,7 @@ public class EchoClientActivity extends AbstractEchoActivity {
 
 	/** Message edit. */
 	private EditText messageEdit;
-	
+
 	/**
 	 * Constructor.
 	 */
@@ -56,6 +56,20 @@ public class EchoClientActivity extends AbstractEchoActivity {
 			throws Exception;
 
 	/**
+	 * Starts the UDP client with the given server IP address and port number.
+	 * 
+	 * @param ip
+	 *            IP address.
+	 * @param port
+	 *            port number.
+	 * @param message
+	 *            message text.
+	 * @throws Exception
+	 */
+	private native void nativeStartUdpClient(String ip, int port, String message)
+			throws Exception;
+
+	/**
 	 * Client task.
 	 */
 	private class ClientTask extends AbstractEchoTask {
@@ -84,15 +98,16 @@ public class EchoClientActivity extends AbstractEchoActivity {
 
 		protected Void doInBackground(Void... params) {
 			publishProgress("Starting client.");
-			
+
 			try {
-				nativeStartTcpClient(ip, port, message);
+				//nativeStartTcpClient(ip, port, message);
+				nativeStartUdpClient(ip, port, message);
 			} catch (Exception e) {
 				publishProgress(e.getMessage());
 			}
 
 			publishProgress("Client terminated.");
-			
+
 			return null;
 		}
 	}

@@ -1,6 +1,5 @@
 package com.apress.echo;
 
-
 /**
  * Echo server.
  * 
@@ -32,6 +31,15 @@ public class EchoServerActivity extends AbstractEchoActivity {
 	private native void nativeStartTcpServer(int port) throws Exception;
 
 	/**
+	 * Starts the UDP server on the given port.
+	 * 
+	 * @param port
+	 *            port number.
+	 * @throws Exception
+	 */
+	private native void nativeStartUdpServer(int port) throws Exception;
+
+	/**
 	 * Server task.
 	 */
 	private class ServerTask extends AbstractEchoTask {
@@ -49,7 +57,8 @@ public class EchoServerActivity extends AbstractEchoActivity {
 			publishProgress("Starting server.");
 
 			try {
-				nativeStartTcpServer(port);
+				//nativeStartTcpServer(port);
+				nativeStartUdpServer(port);
 			} catch (Exception e) {
 				publishProgress(e.getMessage());
 			}

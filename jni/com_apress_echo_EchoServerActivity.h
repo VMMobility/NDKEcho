@@ -63,6 +63,14 @@ extern "C" {
 JNIEXPORT void JNICALL Java_com_apress_echo_EchoServerActivity_nativeStartTcpServer
   (JNIEnv *, jobject, jint);
 
+/*
+ * Class:     com_apress_echo_EchoServerActivity
+ * Method:    nativeStartUdpServer
+ * Signature: (I)V
+ */
+JNIEXPORT void JNICALL Java_com_apress_echo_EchoServerActivity_nativeStartUdpServer
+  (JNIEnv *, jobject, jint);
+
 #ifdef __cplusplus
 }
 #endif
