@@ -13,7 +13,7 @@
 // strerror_r, memset
 #include <string.h>
 
-// socket, bind, getsockname, listen, accept, recv
+// socket, bind, getsockname, listen, accept, recv, send, connect
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -433,6 +433,54 @@ static ssize_t SendToSocket(
 	return sentSize;
 }
 
+/**
+ * Connects to given IP address and given port.
+ *
+ * @param env JNIEnv interface.
+ * @param obj object instance.
+ * @param sd socket descriptor.
+ * @param ip IP address.
+ * @param port port number.
+ * @throws IOException
+ */
+static void ConnectToAddress(
+		JNIEnv* env,
+		jobject obj,
+		int sd,
+		const char* ip,
+		unsigned short port)
+{
+	// Connecting to given IP address and given port
+	LogMessage(env, obj, "Connecting to %s:%uh...", ip, port);
+
+	struct sockaddr_in address;
+
+	memset(&address, 0, sizeof(address));
+	address.sin_family = AF_INET;
+
+	if (0 == inet_aton(ip, &(address.sin_addr)))
+	{
+		// Throw an exception with error number
+		ThrowErrnoException(env, "java/io/IOException", errno);
+	}
+	else
+	{
+		// Convert port to network byte order
+		address.sin_port = htons(port);
+
+		// Connect to address
+		if (-1 == connect(sd, (const sockaddr*) &address, sizeof(address)))
+		{
+			// Throw an exception with error number
+			ThrowErrnoException(env, "java/io/IOException", errno);
+		}
+		else
+		{
+			LogMessage(env, obj, "Connected.");
+		}
+	}
+}
+
 void Java_com_apress_echo_EchoClientActivity_nativeStartTcpClient(
 		JNIEnv* env,
 		jobject obj,
@@ -444,7 +492,49 @@ void Java_com_apress_echo_EchoClientActivity_nativeStartTcpClient(
 	int clientSocket = NewTcpSocket(env, obj);
 	if (NULL == env->ExceptionOccurred())
 	{
+		// Get IP address as C string
+		const char* ipAddress = env->GetStringUTFChars(ip, NULL);
+		if (NULL == ipAddress)
+			goto exit;
 
+		// Connect to IP address and port
+		ConnectToAddress(env, obj, clientSocket, ipAddress,
+				(unsigned short) port);
+
+		// Release the IP address
+		env->ReleaseStringUTFChars(ip, ipAddress);
+
+		// If connection was successful
+		if (NULL != env->ExceptionOccurred())
+			goto exit;
+
+		// Get message as C string
+		const char* messageText = env->GetStringUTFChars(message, NULL);
+		if (NULL == messageText)
+			goto exit;
+
+		// Get the message size
+		jsize messageSize = env->GetStringUTFLength(message);
+
+		// Send message to socket
+		SendToSocket(env, obj, clientSocket, messageText, messageSize);
+
+		// Release the message text
+		env->ReleaseStringUTFChars(message, messageText);
+
+		// If send was not successful
+		if (NULL != env->ExceptionOccurred())
+			goto exit;
+
+		char buffer[MAX_BUFFER_SIZE];
+
+		// Receive from the socket
+		ReceiveFromSocket(env, obj, clientSocket, buffer, MAX_BUFFER_SIZE);
+	}
+
+exit:
+	if (clientSocket > 0)
+	{
 		close(clientSocket);
 	}
 }
