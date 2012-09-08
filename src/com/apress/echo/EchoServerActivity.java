@@ -1,82 +1,25 @@
 package com.apress.echo;
 
-import android.app.Activity;
-import android.os.AsyncTask;
-import android.os.Bundle;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ScrollView;
-import android.widget.TextView;
 
 /**
  * Echo server.
  * 
  * @author Onur Cinar
  */
-public class EchoServerActivity extends Activity implements
-		View.OnClickListener {
-	/** Port number. */
-	private EditText portEdit;
-
-	/** Server button. */
-	private Button startButton;
-
-	/** Log scroll. */
-	private ScrollView logScroll;
-
-	/** Log view. */
-	private TextView logView;
-
-	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_echo_server);
-
-		portEdit = (EditText) findViewById(R.id.port_edit);
-		startButton = (Button) findViewById(R.id.start_button);
-		logScroll = (ScrollView) findViewById(R.id.log_scroll);
-		logView = (TextView) findViewById(R.id.log_view);
-
-		startButton.setOnClickListener(this);
-	}
-
-	public void onClick(View view) {
-		if (view == startButton) {
-			Integer port = getPort();
-			if (port != null) {
-				ServerTask serverTask = new ServerTask();
-				serverTask.execute(port);
-			}
-		}
-	}
-
+public class EchoServerActivity extends AbstractEchoActivity {
 	/**
-	 * Gets the port number as an integer.
-	 * 
-	 * @return port number or null.
+	 * Constructor.
 	 */
-	private Integer getPort() {
-		Integer port;
-
-		try {
-			port = Integer.valueOf(portEdit.getText().toString());
-		} catch (NumberFormatException e) {
-			port = null;
-		}
-
-		return port;
+	public EchoServerActivity() {
+		super(R.layout.activity_echo_server);
 	}
 
-	/**
-	 * Logs the given message.
-	 * 
-	 * @param message
-	 *            log message.
-	 */
-	private void logMessage(String message) {
-		logView.append(message);
-		logView.append("\n");
-		logScroll.fullScroll(View.FOCUS_DOWN);
+	protected void onStartButtonClicked() {
+		Integer port = getPort();
+		if (port != null) {
+			ServerTask serverTask = new ServerTask(port);
+			serverTask.execute();
+		}
 	}
 
 	/**
@@ -91,14 +34,19 @@ public class EchoServerActivity extends Activity implements
 	/**
 	 * Server task.
 	 */
-	private class ServerTask extends AsyncTask<Integer, String, Void> {
-		protected void onPreExecute() {
-			startButton.setEnabled(false);
-			logView.setText("");
+	private class ServerTask extends AbstractEchoTask {
+		/**
+		 * Constructor.
+		 * 
+		 * @param port
+		 *            port number.
+		 */
+		public ServerTask(int port) {
+			super(port);
 		}
 
-		protected Void doInBackground(Integer... ports) {
-			int port = ports[0].intValue();
+		protected Void doInBackground(Void... params) {
+			publishProgress("Starting server.");
 
 			try {
 				nativeStartTcpServer(port);
@@ -106,21 +54,9 @@ public class EchoServerActivity extends Activity implements
 				publishProgress(e.getMessage());
 			}
 
+			publishProgress("Server terminated.");
+
 			return null;
 		}
-
-		protected void onPostExecute(Void result) {
-			startButton.setEnabled(true);
-		}
-
-		protected void onProgressUpdate(String... messages) {
-			for (String message : messages) {
-				logMessage(message);
-			}
-		}
-	}
-	
-	static {
-//		System.loadLibrary("Echo");
 	}
 }
