@@ -1,8 +1,8 @@
 package com.apress.echo;
 
 import android.app.Activity;
-import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -17,9 +17,6 @@ import android.widget.TextView;
  */
 public abstract class AbstractEchoActivity extends Activity implements
 		OnClickListener {
-	/** Local UNIX socket prefix. */
-	protected static final String LOCAL_SOCKET_PREFIX = "com.apress.echo";
-	
 	/** Port number. */
 	protected EditText portEdit;
 
@@ -94,44 +91,70 @@ public abstract class AbstractEchoActivity extends Activity implements
 	protected void logMessage(final String message) {
 		runOnUiThread(new Runnable() {
 			public void run() {
-				logView.append(message);
-				logView.append("\n");
-				logScroll.fullScroll(View.FOCUS_DOWN);
+				logMessageDirect(message);
 			}
 		});
 	}
 
 	/**
+	 * Logs given message directly.
+	 * 
+	 * @param message
+	 *            log message.
+	 */
+	protected void logMessageDirect(final String message) {
+		logView.append(message);
+		logView.append("\n");
+		logScroll.fullScroll(View.FOCUS_DOWN);
+	}
+	
+	/**
 	 * Abstract async echo task.
 	 */
-	protected abstract class AbstractEchoTask extends
-			AsyncTask<Void, String, Void> {
-		/** Port number. */
-		protected final int port;
-
+	protected abstract class AbstractEchoTask extends Thread {
+		/** Handler object. */
+		private final Handler handler;
+		
 		/**
 		 * Constructor.
-		 * 
-		 * @param port
-		 *            port number.
 		 */
-		public AbstractEchoTask(int port) {
-			this.port = port;
+		public AbstractEchoTask() {
+			handler = new Handler();
 		}
-
+		
+		/**
+		 * On pre execute callback in calling thread.
+		 */
 		protected void onPreExecute() {
 			startButton.setEnabled(false);
 			logView.setText("");
 		}
 
-		protected void onPostExecute(Void result) {
-			startButton.setEnabled(true);
+		public synchronized void start() {
+			onPreExecute();			
+			super.start();
 		}
 
-		protected void onProgressUpdate(String... messages) {
-			for (String message : messages) {
-				logMessage(message);
-			}
+		public void run() {
+			onBackground();
+			
+			handler.post(new Runnable() {
+				public void run() {
+					onPostExecute();
+				}
+			});
+		}
+
+		/**
+		 * On background callback in new thread.
+		 */
+		protected abstract void onBackground();
+
+		/**
+		 * On post execute callback in calling thread.
+		 */
+		protected void onPostExecute() {
+			startButton.setEnabled(true);
 		}
 	}
 

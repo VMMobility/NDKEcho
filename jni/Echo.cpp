@@ -1,5 +1,6 @@
 #include "com_apress_echo_EchoClientActivity.h"
 #include "com_apress_echo_EchoServerActivity.h"
+#include "com_apress_echo_LocalEchoActivity.h"
 
 // NULL
 #include <stdio.h>
@@ -26,7 +27,7 @@
 // inet_ntop
 #include <arpa/inet.h>
 
-// close
+// close, unlink
 #include <unistd.h>
 
 // offsetof
@@ -900,17 +901,22 @@ static void BindLocalSocketToName(
 
 	// This is Android specific, local names are starting
 	// with a NULL character
-	address.sun_path[0] = NULL;
+	//address.sun_path[0] = NULL;
 
 	// Append the local name
-	strcpy(&address.sun_path[1], name);
+	strcpy(address.sun_path, name);
 
 	// Address length
-	socklen_t addressLength = (offsetof(struct sockaddr_un, sun_path)) + 1 + strlen(name);
+	/*
+	socklen_t addressLength =
+			offsetof(struct sockaddr_un, sun_path)
+			+ 1
+			+ strlen(name);
+	*/
 
 	// Bind socket
 	LogMessage(env, obj, "Binding to local name (null)%s.", name);
-	if (-1 == bind(sd, (struct sockaddr*) &address, addressLength))
+	if (-1 == bind(sd, (struct sockaddr*) &address, sizeof(address)))
 	{
 		// Throw an exception with error number
 		ThrowErrnoException(env, "java/io/IOException", errno);
@@ -947,7 +953,7 @@ static int AcceptOnLocalSocket(
 	return clientSocket;
 }
 
-void Java_com_apress_echo_EchoServerActivity_nativeStartLocalServer(
+void Java_com_apress_echo_LocalEchoActivity_nativeStartLocalServer(
 		JNIEnv* env,
 		jobject obj,
 		jstring name)

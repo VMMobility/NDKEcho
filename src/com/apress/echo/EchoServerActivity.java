@@ -1,6 +1,7 @@
 package com.apress.echo;
 
 
+
 /**
  * Echo server.
  * 
@@ -18,7 +19,7 @@ public class EchoServerActivity extends AbstractEchoActivity {
 		Integer port = getPort();
 		if (port != null) {
 			ServerTask serverTask = new ServerTask(port);
-			serverTask.execute();
+			serverTask.start();
 		}
 	}
 
@@ -41,18 +42,12 @@ public class EchoServerActivity extends AbstractEchoActivity {
 	private native void nativeStartUdpServer(int port) throws Exception;
 
 	/**
-	 * Starts the Local UNIX socket server binded to given name.
-	 * 
-	 * @param name
-	 *            socket name.
-	 * @throws Exception
-	 */
-	private native void nativeStartLocalServer(String name) throws Exception;
-
-	/**
 	 * Server task.
 	 */
 	private class ServerTask extends AbstractEchoTask {
+		/** Port number. */
+		private final int port;
+		
 		/**
 		 * Constructor.
 		 * 
@@ -60,23 +55,20 @@ public class EchoServerActivity extends AbstractEchoActivity {
 		 *            port number.
 		 */
 		public ServerTask(int port) {
-			super(port);
+			this.port = port;
 		}
 
-		protected Void doInBackground(Void... params) {
-			publishProgress("Starting server.");
+		protected void onBackground() {
+			logMessage("Starting server.");
 
 			try {
 				// nativeStartTcpServer(port);
-				// nativeStartUdpServer(port);
-				nativeStartLocalServer(LOCAL_SOCKET_PREFIX + port);
+				nativeStartUdpServer(port);
 			} catch (Exception e) {
-				publishProgress(e.getMessage());
+				logMessage(e.getMessage());
 			}
 
-			publishProgress("Server terminated.");
-
-			return null;
+			logMessage("Server terminated.");
 		}
 	}
 }

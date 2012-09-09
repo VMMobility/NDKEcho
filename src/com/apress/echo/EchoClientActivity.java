@@ -1,7 +1,5 @@
 package com.apress.echo;
 
-import android.net.LocalSocket;
-import android.net.LocalSocketAddress;
 import android.os.Bundle;
 import android.widget.EditText;
 
@@ -10,7 +8,7 @@ import android.widget.EditText;
  * 
  * @author Onur Cinar
  */
-public class EchoClientActivity extends AbstractEchoActivity {
+public class EchoClientActivity extends AbstractEchoActivity {	
 	/** IP address. */
 	private EditText ipEdit;
 
@@ -38,7 +36,7 @@ public class EchoClientActivity extends AbstractEchoActivity {
 
 		if ((0 != ip.length()) && (port != null) && (0 != message.length())) {
 			ClientTask clientTask = new ClientTask(ip, port, message);
-			clientTask.execute();
+			clientTask.start();
 		}
 	}
 
@@ -72,41 +70,14 @@ public class EchoClientActivity extends AbstractEchoActivity {
 			throws Exception;
 
 	/**
-	 * Starts the local UNIX socket client.
-	 * 
-	 * @param port
-	 *            port number.
-	 * @param message
-	 *            message text.
-	 * @throws Exception
-	 */
-	private void startLocalClient(int port, String message) throws Exception {
-		logMessage("startLocalClient");
-		
-		// Construct a local socket
-		LocalSocket clientSocket = new LocalSocket();
-		
-		logMessage("startLocalClient 1");
-
-		// Construct local socket address
-		LocalSocketAddress address = new LocalSocketAddress(LOCAL_SOCKET_PREFIX + port);
-		
-		// Connect to local socket
-		logMessage("Connecting to " + address.toString());
-		clientSocket.connect(address);
-		
-		logMessage("Connected");
-		
-		// Close the local socket
-		clientSocket.close();
-	}
-
-	/**
 	 * Client task.
 	 */
 	private class ClientTask extends AbstractEchoTask {
 		/** IP address to connect. */
 		private final String ip;
+
+		/** Port number. */
+		private final int port;
 
 		/** Message text to send. */
 		private final String message;
@@ -122,26 +93,22 @@ public class EchoClientActivity extends AbstractEchoActivity {
 		 *            message text to send.
 		 */
 		public ClientTask(String ip, int port, String message) {
-			super(port);
-
 			this.ip = ip;
+			this.port = port;
 			this.message = message;
 		}
 
-		protected Void doInBackground(Void... params) {
-			publishProgress("Starting client.");
+		protected void onBackground() {
+			logMessage("Starting client.");
 
 			try {
 				// nativeStartTcpClient(ip, port, message);
-				// nativeStartUdpClient(ip, port, message);
-				startLocalClient(port, message);
-			} catch (Exception e) {
-				publishProgress(e.getMessage());
+				nativeStartUdpClient(ip, port, message);
+			} catch (Throwable e) {
+				logMessage(e.getMessage());
 			}
 
-			publishProgress("Client terminated.");
-
-			return null;
+			logMessage("Client terminated.");
 		}
 	}
 }
