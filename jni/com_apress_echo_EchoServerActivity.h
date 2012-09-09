@@ -71,6 +71,14 @@ JNIEXPORT void JNICALL Java_com_apress_echo_EchoServerActivity_nativeStartTcpSer
 JNIEXPORT void JNICALL Java_com_apress_echo_EchoServerActivity_nativeStartUdpServer
   (JNIEnv *, jobject, jint);
 
+/*
+ * Class:     com_apress_echo_EchoServerActivity
+ * Method:    nativeStartLocalServer
+ * Signature: (Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_com_apress_echo_EchoServerActivity_nativeStartLocalServer
+  (JNIEnv *, jobject, jstring);
+
 #ifdef __cplusplus
 }
 #endif

@@ -17,6 +17,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+// sockaddr_un
+#include <sys/un.h>
+
 // htons, sockaddr_in
 #include <netinet/in.h>
 
@@ -25,6 +28,9 @@
 
 // close
 #include <unistd.h>
+
+// offsetof
+#include <stddef.h>
 
 // Max log message length
 #define MAX_LOG_MESSAGE_LENGTH 256
@@ -183,7 +189,7 @@ static void BindSocketToPort(
 
 	// Address to bind socket
 	memset(&address, 0, sizeof(address));
-	address.sin_family = AF_INET;
+	address.sin_family = PF_INET;
 
 	// Bind to all addresses
 	address.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -456,7 +462,7 @@ static void ConnectToAddress(
 	struct sockaddr_in address;
 
 	memset(&address, 0, sizeof(address));
-	address.sin_family = AF_INET;
+	address.sin_family = PF_INET;
 
 	// Convert IP address string to Internet address
 	if (0 == inet_aton(ip, &(address.sin_addr)))
@@ -737,7 +743,7 @@ void Java_com_apress_echo_EchoClientActivity_nativeStartUdpClient(
 		struct sockaddr_in address;
 
 		memset(&address, 0, sizeof(address));
-		address.sin_family = AF_INET;
+		address.sin_family = PF_INET;
 
 		// Get IP address as C string
 		const char* ipAddress = env->GetStringUTFChars(ip, NULL);
@@ -838,6 +844,167 @@ void Java_com_apress_echo_EchoServerActivity_nativeStartUdpServer(
 		// Send to the socket
 		sentSize = SendDatagramToSocket(env, obj, serverSocket,
 				&address, buffer, (size_t) recvSize);
+	}
+
+exit:
+	if (serverSocket > 0)
+	{
+		close(serverSocket);
+	}
+}
+
+/**
+ * Constructs a new Local UNIX socket.
+ *
+ * @param env JNIEnv interface.
+ * @param obj object instance.
+ * @return socket descriptor.
+ * @throws IOException
+ */
+static int NewLocalSocket(JNIEnv* env, jobject obj)
+{
+	// Construct socket
+	LogMessage(env, obj, "Constructing a new Local UNIX socket...");
+	int localSocket = socket(PF_LOCAL, SOCK_STREAM, 0);
+
+	// Check if socket is properly constructed
+	if (-1 == localSocket)
+	{
+		// Throw an exception with error number
+		ThrowErrnoException(env, "java/io/IOException", errno);
+	}
+
+	return localSocket;
+}
+
+/**
+ * Binds a local UNIX socket to a name.
+ *
+ * @param env JNIEnv interface.
+ * @param obj object instance.
+ * @param sd socket descriptor.
+ * @param name socket name.
+ * @throws IOException
+ */
+static void BindLocalSocketToName(
+		JNIEnv* env,
+		jobject obj,
+		int sd,
+		const char* name)
+{
+	struct sockaddr_un address;
+
+	// Address to bind socket
+	memset(&address, 0, sizeof(address));
+	address.sun_family = PF_LOCAL;
+
+	// This is Android specific, local names are starting
+	// with a NULL character
+	address.sun_path[0] = NULL;
+
+	// Append the local name
+	strcpy(&address.sun_path[1], name);
+
+	// Address length
+	socklen_t addressLength = (offsetof(struct sockaddr_un, sun_path)) + 1 + strlen(name);
+
+	// Bind socket
+	LogMessage(env, obj, "Binding to local name (null)%s.", name);
+	if (-1 == bind(sd, (struct sockaddr*) &address, addressLength))
+	{
+		// Throw an exception with error number
+		ThrowErrnoException(env, "java/io/IOException", errno);
+	}
+}
+
+/**
+ * Blocks and waits for incoming client connections on the
+ * given socket.
+ *
+ * @param env JNIEnv interface.
+ * @param obj object instance.
+ * @param sd socket descriptor.
+ * @return client socket.
+ * @throws IOException
+ */
+static int AcceptOnLocalSocket(
+		JNIEnv* env,
+		jobject obj,
+		int sd)
+{
+	// Blocks and waits for an incoming client connection
+	// and accepts it
+	LogMessage(env, obj, "Waiting for a client connection...");
+	int clientSocket = accept(sd, NULL, NULL);
+
+	// If client socket is not valid
+	if (-1 == clientSocket)
+	{
+		// Throw an exception with error number
+		ThrowErrnoException(env, "java/io/IOException", errno);
+	}
+
+	return clientSocket;
+}
+
+void Java_com_apress_echo_EchoServerActivity_nativeStartLocalServer(
+		JNIEnv* env,
+		jobject obj,
+		jstring name)
+{
+	// Construct a new local UNIX socket.
+	int serverSocket = NewLocalSocket(env, obj);
+	if (NULL == env->ExceptionOccurred())
+	{
+		// Get name as C string
+		const char* nameText = env->GetStringUTFChars(name, NULL);
+		if (NULL == nameText)
+			goto exit;
+
+		// Bind socket to a port number
+		BindLocalSocketToName(env, obj, serverSocket, nameText);
+
+		// Release the name text
+		env->ReleaseStringUTFChars(name, nameText);
+
+		// If bind is failed
+		if (NULL != env->ExceptionOccurred())
+			goto exit;
+
+		// Listen on socket with a backlog of 4 pending connections
+		ListenOnSocket(env, obj, serverSocket, 4);
+		if (NULL != env->ExceptionOccurred())
+			goto exit;
+
+		// Accept a client connection on socket
+		int clientSocket = AcceptOnLocalSocket(env, obj, serverSocket);
+		if (NULL != env->ExceptionOccurred())
+			goto exit;
+
+		char buffer[MAX_BUFFER_SIZE];
+		ssize_t recvSize;
+		ssize_t sentSize;
+
+		// Receive and send back the data
+		while (1)
+		{
+			// Receive from the socket
+			recvSize = ReceiveFromSocket(env, obj, clientSocket,
+					buffer, MAX_BUFFER_SIZE);
+
+			if ((0 == recvSize) || (NULL != env->ExceptionOccurred()))
+				break;
+
+			// Send to the socket
+			sentSize = SendToSocket(env, obj, clientSocket,
+					buffer, (size_t) recvSize);
+
+			if ((0 == sentSize) || (NULL != env->ExceptionOccurred()))
+				break;
+		}
+
+		// Close the client socket
+		close(clientSocket);
 	}
 
 exit:

@@ -17,6 +17,9 @@ import android.widget.TextView;
  */
 public abstract class AbstractEchoActivity extends Activity implements
 		OnClickListener {
+	/** Local UNIX socket prefix. */
+	protected static final String LOCAL_SOCKET_PREFIX = "com.apress.echo";
+	
 	/** Port number. */
 	protected EditText portEdit;
 

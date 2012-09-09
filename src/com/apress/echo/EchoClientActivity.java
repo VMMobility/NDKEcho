@@ -1,5 +1,7 @@
 package com.apress.echo;
 
+import android.net.LocalSocket;
+import android.net.LocalSocketAddress;
 import android.os.Bundle;
 import android.widget.EditText;
 
@@ -70,6 +72,36 @@ public class EchoClientActivity extends AbstractEchoActivity {
 			throws Exception;
 
 	/**
+	 * Starts the local UNIX socket client.
+	 * 
+	 * @param port
+	 *            port number.
+	 * @param message
+	 *            message text.
+	 * @throws Exception
+	 */
+	private void startLocalClient(int port, String message) throws Exception {
+		logMessage("startLocalClient");
+		
+		// Construct a local socket
+		LocalSocket clientSocket = new LocalSocket();
+		
+		logMessage("startLocalClient 1");
+
+		// Construct local socket address
+		LocalSocketAddress address = new LocalSocketAddress(LOCAL_SOCKET_PREFIX + port);
+		
+		// Connect to local socket
+		logMessage("Connecting to " + address.toString());
+		clientSocket.connect(address);
+		
+		logMessage("Connected");
+		
+		// Close the local socket
+		clientSocket.close();
+	}
+
+	/**
 	 * Client task.
 	 */
 	private class ClientTask extends AbstractEchoTask {
@@ -100,8 +132,9 @@ public class EchoClientActivity extends AbstractEchoActivity {
 			publishProgress("Starting client.");
 
 			try {
-				//nativeStartTcpClient(ip, port, message);
-				nativeStartUdpClient(ip, port, message);
+				// nativeStartTcpClient(ip, port, message);
+				// nativeStartUdpClient(ip, port, message);
+				startLocalClient(port, message);
 			} catch (Exception e) {
 				publishProgress(e.getMessage());
 			}
