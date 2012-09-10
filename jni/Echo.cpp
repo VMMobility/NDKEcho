@@ -2,6 +2,9 @@
 #include "com_apress_echo_EchoServerActivity.h"
 #include "com_apress_echo_LocalEchoActivity.h"
 
+// JNI
+#include <jni.h>
+
 // NULL
 #include <stdio.h>
 
@@ -895,31 +898,66 @@ static void BindLocalSocketToName(
 {
 	struct sockaddr_un address;
 
-	// Address to bind socket
-	memset(&address, 0, sizeof(address));
-	address.sun_family = PF_LOCAL;
+	// Name length
+	const size_t nameLength = strlen(name);
 
-	// This is Android specific, local names are starting
-	// with a NULL character
-	//address.sun_path[0] = NULL;
+	// Path length is initiall equal to name length
+	size_t pathLength = nameLength;
 
-	// Append the local name
-	strcpy(address.sun_path, name);
+	// If name is not starting with a slash it is
+	// in the abstract namespace
+	bool abstractNamespace = ('/' != name[0]);
 
-	// Address length
-	/*
-	socklen_t addressLength =
-			offsetof(struct sockaddr_un, sun_path)
-			+ 1
-			+ strlen(name);
-	*/
+	// Abstract namespace requires having the first
+	// byte of the path to be the zero byte, update
+	// the path length to include the zero byte
+	if (abstractNamespace)
+	{
+		pathLength++;
+	}
 
-	// Bind socket
-	LogMessage(env, obj, "Binding to local name (null)%s.", name);
-	if (-1 == bind(sd, (struct sockaddr*) &address, sizeof(address)))
+	// Check the path length
+	if (pathLength > sizeof(address.sun_path))
 	{
 		// Throw an exception with error number
-		ThrowErrnoException(env, "java/io/IOException", errno);
+		ThrowException(env, "java/io/IOException", "Name is too big.");
+	}
+	else
+	{
+		// Clear the address bytes
+		memset(&address, 0, sizeof(address));
+		address.sun_family = PF_LOCAL;
+
+		// Socket path
+		char* sunPath = address.sun_path;
+
+		// First byte must be zero to use the abstract namespace
+		if (abstractNamespace)
+		{
+			*sunPath++ = NULL;
+		}
+
+		// Append the local name
+		strcpy(sunPath, name);
+
+		// Address length
+		socklen_t addressLength =
+				(offsetof(struct sockaddr_un, sun_path))
+				+ pathLength;
+
+		// Unlink if the socket name is already binded
+		unlink(address.sun_path);
+
+		// Bind socket
+		LogMessage(env, obj, "Binding to local name %s%s.",
+				(abstractNamespace) ? "(null)" : "",
+				name);
+
+		if (-1 == bind(sd, (struct sockaddr*) &address, addressLength))
+		{
+			// Throw an exception with error number
+			ThrowErrnoException(env, "java/io/IOException", errno);
+		}
 	}
 }
 

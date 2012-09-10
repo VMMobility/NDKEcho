@@ -1,6 +1,8 @@
 package com.apress.echo;
 
 import java.io.File;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
@@ -19,8 +21,8 @@ public class LocalEchoActivity extends AbstractEchoActivity {
 	/**
 	 * Constructor.
 	 */
-    public LocalEchoActivity() {
-    	super(R.layout.activity_local_echo);
+	public LocalEchoActivity() {
+		super(R.layout.activity_local_echo);
 	}
 
 	public void onCreate(Bundle savedInstanceState) {
@@ -32,20 +34,38 @@ public class LocalEchoActivity extends AbstractEchoActivity {
 	protected void onStartButtonClicked() {
 		String name = portEdit.getText().toString();
 		String message = messageEdit.getText().toString();
-		
-		if ((name.length() > 0) && (message.length() > 0))
-		{
-			File file = new File(getFilesDir(), name);
-			String fileName = file.getAbsolutePath(); 
-			
-			ServerTask serverTask = new ServerTask(fileName);
-			serverTask.start();			
 
-			ClientTask clientTask = new ClientTask(fileName, message);
+		if ((name.length() > 0) && (message.length() > 0)) {
+			String socketName;
+
+			// If it is a filesystem socket, prepend the
+			// application files directory
+			if (isFilesystemSocket(name)) {
+				File file = new File(getFilesDir(), name);
+				socketName = file.getAbsolutePath();
+			} else {
+				socketName = name;
+			}
+
+			ServerTask serverTask = new ServerTask(socketName);
+			serverTask.start();
+
+			ClientTask clientTask = new ClientTask(socketName, message);
 			clientTask.start();
 		}
 	}
-	
+
+	/**
+	 * Check if name is a filesystem socket.
+	 * 
+	 * @param name
+	 *            socket name.
+	 * @return filesystem socket.
+	 */
+	private boolean isFilesystemSocket(String name) {
+		return name.startsWith("/");
+	}
+
 	/**
 	 * Starts the Local UNIX socket server binded to given name.
 	 * 
@@ -66,23 +86,51 @@ public class LocalEchoActivity extends AbstractEchoActivity {
 	 */
 	private void startLocalClient(String name, String message) throws Exception {
 		// Construct a local socket
-		//LocalServerSocket serverSocket = new LocalServerSocket(LOCAL_SOCKET_PREFIX);
-		
-		// Construct a local socket
 		LocalSocket clientSocket = new LocalSocket();
-		
-		// Construct local socket address
-		LocalSocketAddress address = new LocalSocketAddress(name, 
-				LocalSocketAddress.Namespace.FILESYSTEM);
-		
-		// Connect to local socket
-		logMessage("Connecting to " + address.getNamespace().toString() + " " + address.getName());
-		clientSocket.connect(address);
-
-		logMessage("Connected");
-				
-		// Close the local socket
-		clientSocket.close();
+		try {
+			// Set the socket namespace
+			LocalSocketAddress.Namespace namespace;
+			if (isFilesystemSocket(name)) {
+				namespace = LocalSocketAddress.Namespace.FILESYSTEM;
+			} else {
+				namespace = LocalSocketAddress.Namespace.ABSTRACT;
+			}
+	
+			// Construct local socket address
+			LocalSocketAddress address = new LocalSocketAddress(name, namespace);
+	
+			// Connect to local socket
+			logMessage("Connecting to " + name);		
+			clientSocket.connect(address);
+			logMessage("Connected.");
+			
+			// Get message as bytes
+			byte[] messageBytes = message.getBytes();
+			
+			// Send message bytes to the socket
+			logMessage("Sending to the socket...");
+			OutputStream outputStream = clientSocket.getOutputStream();
+			outputStream.write(messageBytes);
+			logMessage(String.format("Sent %d bytes: %s", 
+					messageBytes.length, message));
+						
+			// Receive the message back from the socket
+			logMessage("Receiving from the socket...");
+			InputStream inputStream = clientSocket.getInputStream();
+			int readSize = inputStream.read(messageBytes);
+			
+			String receivedMessage = new String(messageBytes, 0, readSize);
+			logMessage(String.format("Received %d bytes: %s", 
+					readSize, receivedMessage));
+			
+			// Close streams
+			outputStream.close();
+			inputStream.close();
+			
+		} finally { 
+			// Close the local socket
+			clientSocket.close();
+		}
 	}
 
 	/**
@@ -91,16 +139,17 @@ public class LocalEchoActivity extends AbstractEchoActivity {
 	private class ServerTask extends AbstractEchoTask {
 		/** Socket name. */
 		private final String name;
-		
+
 		/**
 		 * Constructor.
 		 * 
-		 * @param name socket name.
+		 * @param name
+		 *            socket name.
 		 */
 		public ServerTask(String name) {
 			this.name = name;
 		}
-		
+
 		protected void onBackground() {
 			logMessage("Starting server.");
 
@@ -113,7 +162,7 @@ public class LocalEchoActivity extends AbstractEchoActivity {
 			logMessage("Server terminated.");
 		}
 	}
-	
+
 	/**
 	 * Client task.
 	 */
@@ -123,18 +172,19 @@ public class LocalEchoActivity extends AbstractEchoActivity {
 
 		/** Message text to send. */
 		private final String message;
-		
+
 		/**
 		 * Constructor.
 		 * 
 		 * @parma name socket name.
-		 * @param message message text to send.
+		 * @param message
+		 *            message text to send.
 		 */
 		public ClientTask(String name, String message) {
 			this.name = name;
 			this.message = message;
 		}
-		
+
 		public void run() {
 			logMessage("Starting client.");
 
